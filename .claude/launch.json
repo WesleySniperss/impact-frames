@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "impact-frames-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "5174", "preview"],
+      "port": 5174
+    }
+  ]
+}

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>Impact Frames — Preview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0d0d; color: #eee;
+    font-family: 'Segoe UI', sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 20px; gap: 16px;
+  }
+  h1 { font-size: 0.85rem; letter-spacing: 5px; color: #444; text-transform: uppercase; margin-top: 4px; }
+
+  .elem-picker { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  .elem-btn {
+    padding: 5px 13px; border-radius: 4px; border: 1px solid #252525;
+    background: #111; color: #555; font-size: 0.68rem; letter-spacing: 1px;
+    cursor: pointer; transition: all 0.12s; text-transform: uppercase;
+  }
+  .elem-btn:hover { border-color: #3a3a3a; color: #aaa; }
+  .elem-btn.active { color: #fff; }
+  .elem-btn[data-e="none"].active      { border-color: #888;    background: #1e1e1e; }
+  .elem-btn[data-e="fire"].active      { border-color: #ff6600; background: rgba(255,100,0,.13); }
+  .elem-btn[data-e="ice"].active       { border-color: #44ccff; background: rgba(68,204,255,.10); }
+  .elem-btn[data-e="lightning"].active { border-color: #88aaff; background: rgba(136,170,255,.10); }
+  .elem-btn[data-e="arcane"].active    { border-color: #aa55ff; background: rgba(170,85,255,.10); }
+  .elem-btn[data-e="shadow"].active    { border-color: #9900cc; background: rgba(153,0,204,.13); }
+  .elem-btn[data-e="poison"].active    { border-color: #44dd44; background: rgba(68,220,68,.10); }
+  .elem-btn[data-e="necrotic"].active  { border-color: #660066; background: rgba(100,0,100,.14); }
+  .elem-btn[data-e="force"].active     { border-color: #88aaff; background: rgba(100,150,255,.10); }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 980px; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .label { font-size: 0.62rem; letter-spacing: 2px; text-transform: uppercase; color: #444; }
+  canvas { border: 1px solid #1a1a1a; border-radius: 4px; cursor: pointer; background: #070707; display: block; }
+  canvas:hover { border-color: #333; }
+  .hint { font-size: 0.58rem; color: #333; letter-spacing: 2px; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<h1>Impact Frames</h1>
+<div class="elem-picker" id="picker"></div>
+<div class="grid" id="grid"></div>
+<p class="hint">Click to replay</p>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@7/dist/pixi.min.js"></script>
+<script>
+const ELEMENTS = {
+  none:      { label:'None',      icon:'○', chunks:['#dddddd','#ffffff','#aaaaaa'], bolts:'#cccccc', ring:'#ffffff', chunkCount:44, boltCount:10, chunkSpeed:[35,95],  chunkSize:[1.5,4.5] },
+  fire:      { label:'Fire',      icon:'🔥', chunks:['#ffcc00','#ff4400','#ff8800'], bolts:'#ff9900', ring:'#ff6600', chunkCount:56, boltCount:4,  chunkSpeed:[60,145], chunkSize:[1.6,5],  sparkMode:true },
+  ice:       { label:'Ice',       icon:'❄️', chunks:['#aaeeff','#66ccff','#ddf8ff'], bolts:'#99eeff', ring:'#44ccff', chunkCount:32, boltCount:5,  chunkSpeed:[18,52],  chunkSize:[2,5],    iceMode:true },
+  arcane:    { label:'Arcane',    icon:'✨', chunks:['#cc80ff','#9933ff','#ffffff'], bolts:'#cc88ff', ring:'#aa55ff', chunkCount:34, boltCount:14, chunkSpeed:[35,90],  chunkSize:[1.6,4],  starMode:true },
+  shadow:    { label:'Shadow',    icon:'🌑', chunks:['#440066','#880099','#cc00ff'], bolts:'#660088', ring:'#9900cc', chunkCount:26, boltCount:16, chunkSpeed:[18,50],  chunkSize:[3.5,9],  darkMode:true },
+  lightning: { label:'Lightning', icon:'⚡', chunks:['#ffffff','#88aaff','#ccddff'], bolts:'#aabbff', ring:'#88aaff', chunkCount:28, boltCount:28, chunkSpeed:[70,160], chunkSize:[1.6,4],  boltMode:true },
+  poison:    { label:'Poison',    icon:'☠️', chunks:['#55ff55','#22bb22','#aaff88'], bolts:'#66ff44', ring:'#44dd44', chunkCount:38, boltCount:3,  chunkSpeed:[10,38],  chunkSize:[2,5.5],  bubbleMode:true },
+  necrotic:  { label:'Necrotic',  icon:'💀', chunks:['#220033','#440055','#880077'], bolts:'#330044', ring:'#660066', chunkCount:28, boltCount:8,  chunkSpeed:[8,32],   chunkSize:[2.5,7],  wispMode:true },
+  force:     { label:'Force',     icon:'💠', chunks:['#aaccff','#6699ff','#eef4ff'], bolts:'#88aaff', ring:'#99bbff', chunkCount:30, boltCount:6,  chunkSpeed:[45,100], chunkSize:[2,5],    orbMode:true },
+};
+
+// ─── PIXI helpers ──────────────────────────────────────────────────────────────
+const gR =(g,x,y,w,h,c,a)=>{if(a<=0)return;g.beginFill(c,a);g.drawRect(x,y,w,h);g.endFill();};
+const gCF=(g,cx,cy,r,c,a)=>{if(a<=0||r<=0)return;g.beginFill(c,a);g.drawCircle(cx,cy,r);g.endFill();};
+const gCS=(g,cx,cy,r,c,w,a)=>{if(a<=0||r<=0||w<=0)return;g.lineStyle(w,c,a);g.drawCircle(cx,cy,r);g.lineStyle(0);};
+const gL =(g,x0,y0,x1,y1,c,w,a)=>{if(a<=0||w<=0)return;g.lineStyle(w,c,a);g.moveTo(x0,y0);g.lineTo(x1,y1);g.lineStyle(0);};
+const gPF=(g,pts,c,a)=>{
+  if(a<=0||pts.length<2)return;
+  g.beginFill(c,a);g.moveTo(pts[0][0],pts[0][1]);
+  for(let j=1;j<pts.length;j++)g.lineTo(pts[j][0],pts[j][1]);
+  g.closePath();g.endFill();
+};
+const gLS=(g,pts,c,w,a)=>{
+  if(a<=0||w<=0||pts.length<2)return;
+  g.lineStyle(w,c,a);g.moveTo(pts[0][0],pts[0][1]);
+  for(let j=1;j<pts.length;j++)g.lineTo(pts[j][0],pts[j][1]);
+  g.lineStyle(0);
+};
+
+function eO(t){return 1-Math.pow(1-t,3);}
+function rm(v,a,b){return Math.max(0,Math.min(1,(v-a)/(b-a)));}
+function rng(s){const x=Math.sin(s*9301+49297)*233280;return x-Math.floor(x);}
+function hi(h){return parseInt(h.replace('#',''),16);}
+
+// ─── Particle builders ─────────────────────────────────────────────────────────
+function buildChunks(el, seed) {
+  return Array.from({length: el.chunkCount}, (_,i) => {
+    const s = seed+i;
+    const angle    = rng(s*3.7)*Math.PI*2;
+    const spd      = el.chunkSpeed[0]+rng(s*1.9)*(el.chunkSpeed[1]-el.chunkSpeed[0]);
+    const born     = rng(s*5.3)*0.18;
+    const life     = born+0.22+rng(s*2.1)*0.32;
+    const size     = el.chunkSize[0]+rng(s*8.1)*(el.chunkSize[1]-el.chunkSize[0]);
+    const colorIdx = Math.floor(rng(s*6.3)*el.chunks.length);
+    let pts;
+    if(el.sparkMode){
+      const tilt=(rng(s*2.1)-0.5)*0.35;
+      pts=[[tilt-0.09,0.42],[tilt,-1.0],[tilt+0.09,0.42]];
+    }else if(el.iceMode){
+      pts=Array.from({length:12},(_,j)=>{const a=(j/12)*Math.PI*2-Math.PI/6,r=j%2===0?1.0:0.36;return[Math.cos(a)*r,Math.sin(a)*r];});
+    }else if(el.boltMode){
+      pts=[[0.25,0.18],[0.02,-0.32],[0.34,-0.40],[-0.10,-1.08]];
+    }else if(el.starMode){
+      pts=Array.from({length:8},(_,j)=>{const a=(j/8)*Math.PI*2,r=j%2===0?1.0:0.22;return[Math.cos(a)*r,Math.sin(a)*r];});
+    }else if(el.darkMode){
+      const n=4+Math.floor(rng(s*4.4)*3);
+      pts=Array.from({length:n},(_,j)=>{const a=(j/n)*Math.PI*2+rng(s*9+j)*0.85;return[Math.cos(a)*(0.5+rng(s*11+j)*1.1),Math.sin(a)*(0.5+rng(s*11+j)*1.1)];});
+    }else if(el.bubbleMode){
+      pts=Array.from({length:8},(_,j)=>{const a=(j/8)*Math.PI*2,r=0.82+rng(s*7+j)*0.25;return[Math.cos(a)*r,Math.sin(a)*r];});
+    }else if(el.wispMode){
+      const l=0.8+rng(s*3)*0.75,w=0.18+rng(s*5)*0.14;
+      pts=[[0,-l],[w,-l*0.12],[w*0.55,l*0.38],[-w*0.55,l*0.38],[-w,-l*0.12]];
+    }else if(el.orbMode){
+      pts=Array.from({length:6},(_,j)=>{const a=(j/6)*Math.PI*2;return[Math.cos(a)*0.88,Math.sin(a)*0.88];});
+    }else{
+      const n=3+Math.floor(rng(s*4.4)*4);
+      pts=Array.from({length:n},(_,j)=>{const a=(j/n)*Math.PI*2,r=0.4+rng(s*11+j)*0.9;return[Math.cos(a)*r,Math.sin(a)*r];});
+    }
+    return{angle,speed:spd,born,life,pts,size,colorIdx};
+  });
+}
+function buildBolts(el,seed){
+  return Array.from({length:el.boltCount},(_,i)=>{
+    const s=seed+1000+i;
+    const angle=rng(s*6.1)*Math.PI*2,born=rng(s*3.3)*0.25,life=born+0.1+rng(s*7.7)*0.2;
+    const len=40+rng(s*2.9)*120,segs=3+Math.floor(rng(s*4.1)*5);
+    const pts=Array.from({length:segs+1},(_,j)=>{
+      const t=j/segs,bx=Math.cos(angle)*len*t,by=Math.sin(angle)*len*t;
+      const jag=(rng(s*13+j)-0.5)*len*0.3*(1-t);
+      return[bx-Math.sin(angle)*jag,by+Math.cos(angle)*jag];
+    });
+    return{born,life,pts};
+  });
+}
+
+// ─── Anim ──────────────────────────────────────────────────────────────────────
+class Anim {
+  constructor(app,type,ek){
+    this.app=app;this.type=type;
+    this.W=app.renderer.width;this.H=app.renderer.height;
+    this.cx=this.W/2;this.cy=this.H/2;
+    // tw/th/R більші → партікли помітні
+    this.tw=100;this.th=100;this.R=50;
+    this.el=ELEMENTS[ek]??ELEMENTS.none;
+    this.rh=hi(this.el.ring);
+    this.seed=Math.floor(Math.random()*9999);
+    this.chunks=buildChunks(this.el,this.seed);
+    this.bolts=buildBolts(this.el,this.seed);
+  }
+  play(){
+    const cont=new PIXI.Container();this.app.stage.addChild(cont);
+    const g=new PIXI.Graphics();cont.addChild(g);
+    const DUR=900,t0=performance.now();
+    const tick=(now)=>{
+      const it=Math.min((now-t0)/DUR,1);g.clear();
+      if(this.type==='streak')    this.streak(g,it);
+      if(this.type==='glint')     this.glint(g,it);
+      if(this.type==='particles') this.particles(g,it);
+      if(this.type==='shockwave') this.shockwave(g,it);
+      if(this.type==='pillar')    this.pillar(g,it);
+      if(this.type==='slash')     this.slash(g,it);
+      if(it<1)requestAnimationFrame(tick);
+      else cont.destroy({children:true});
+    };
+    requestAnimationFrame(tick);
+  }
+
+  streak(g,it){
+    const{cx,cy,W,R,rh}=this;
+    const aH=this.th*2.4,aY=cy-aH/2;
+    if(it<0.18){const fp=Math.sin((it/0.18)*Math.PI);gR(g,0,aY,W,aH,0xFFFFFF,fp*0.85);return;}
+    const sp=eO(rm(it,0.07,0.17)),fade=it>0.5?1-rm(it,0.5,0.90):1,ga=sp*fade;
+    if(ga<0.005)return;
+    const reach=R*12,gH=aH*0.09,ROWS=8,HSTEPS=22,rowH=gH/ROWS;
+    for(let row=0;row<=ROWS;row++){
+      const vt=row/ROWS,rr=reach*Math.pow(1-vt,0.65),ra=ga*Math.pow(1-vt,1.6);
+      if(ra<0.004||rr<1)continue;
+      const dy=row*rowH,da=ra/HSTEPS;
+      for(let i=0;i<HSTEPS;i++){const hw=rr*(1-i/HSTEPS);gR(g,cx-hw,cy+dy,hw*2,rowH+1,rh,da);if(row>0)gR(g,cx-hw,cy-dy-rowH,hw*2,rowH+1,rh,da);}
+    }
+    this.ch_(g,it);
+  }
+
+  glint(g,it){
+    const{cx,cy,R,W,H,rh}=this;
+    const cR=it<0.45?R*0.12+rm(it,0,0.28)*R*0.95:R*1.1*(1-rm(it,0.45,0.72));
+    const cA=it<0.72?1:1-rm(it,0.72,0.88);
+    if(cR>0&&cA>0){gCF(g,cx,cy,cR*2.2,rh,cA*0.12);gCF(g,cx,cy,cR,0xFFFFFF,cA);}
+    const rP=rm(it,0.05,0.28),rF=it>0.38?1-rm(it,0.38,0.65):1;
+    if(rP>0&&rF>0){
+      const p=eO(rP),sp=it*Math.PI;
+      for(const[a,hl,al]of[[0+sp*.55,W*.46*p,rF],[Math.PI/2-sp*.38,H*.44*p,rF*.75],[Math.PI/4+sp*.72,W*.28*p,rF*.45],[-Math.PI/4-sp*.48,W*.24*p,rF*.38]]){
+        const cos=Math.cos(a),sin=Math.sin(a),x0=cx-cos*hl,y0=cy-sin*hl,x1=cx+cos*hl,y1=cy+sin*hl;
+        gL(g,x0,y0,x1,y1,rh,6,al*0.30);gL(g,x0,y0,x1,y1,0xFFFFFF,2,al*0.9);gL(g,x0,y0,x1,y1,0xFFFFFF,.8,al);
+      }
+    }
+    const rp=rm(it,.28,.52),rf=it>.55?1-rm(it,.55,.80):1,rr=R*.85+eO(rp)*R*1.7,rw=2.8*(1-rp*.65);
+    if(rp>0&&rf>0&&rw>.2)gCS(g,cx,cy,rr,rh,rw,rf*.88);
+    this.ch_(g,it);
+  }
+
+  particles(g,it){
+    const{cx,cy,R,rh}=this;
+    if(it<0.18){const fp=Math.sin((it/0.18)*Math.PI);gCF(g,cx,cy,R*(1.4+fp*1.8),0xFFFFFF,fp*.8);}
+    this.ch_(g,it);this.bl_(g,it);
+    const rp=rm(it,.06,.42),rf=it>.44?1-rm(it,.44,.75):1,rr=R*.9+eO(rp)*R*1.9,rw=2.2*(1-rp*.7);
+    if(rp>0&&rf>0&&rw>.2)gCS(g,cx,cy,rr,rh,rw,rf*.75);
+  }
+
+  shockwave(g,it){
+    const{cx,cy,R,rh}=this;
+    if(it<0.16){const fp=Math.sin((it/0.16)*Math.PI);gCF(g,cx,cy,R*(0.9+fp*2.0),0xFFFFFF,fp*.88);gCF(g,cx,cy,R*(0.5+fp*.9),0xFFFFFF,fp*.40);}
+    for(const[d,sp,al]of[[0,.0,3.8,.90],[.10,3.0,.65],[.24,2.2,.38]]){
+      const rp=rm(it,d,d+0.64);if(rp<=0)continue;
+      const rf=1-rp,rr=R*.4+eO(rp)*R*sp,bw=2.6*(1-rp*.52);
+      if(bw<.12||rf<.01)continue;
+      for(let i=0;i<64;i++){
+        const a0=(i/64)*Math.PI*2,a1=((i+1)/64)*Math.PI*2;
+        const tp=.25+.75*Math.pow(Math.abs(Math.cos((a0+a1)*.5)),.6);
+        if(rf*al*tp<.01)continue;
+        gL(g,cx+Math.cos(a0)*rr,cy+Math.sin(a0)*rr,cx+Math.cos(a1)*rr,cy+Math.sin(a1)*rr,rh,bw,rf*al*tp);
+      }
+    }
+    this.ch_(g,it);
+  }
+
+  pillar(g,it){
+    const{cx,cy,R,rh}=this;
+    const pA=it<0.24?rm(it,0,.18):1-rm(it,.24,.42);
+    if(pA>.01){const pW=R*.45;gR(g,cx-pW*3.5,0,pW*7,cy,rh,pA*.06);gR(g,cx-pW*1.4,0,pW*2.8,cy,rh,pA*.22);gR(g,cx-pW*.35,0,pW*.7,cy,0xFFFFFF,pA*.90);}
+    const fP=rm(it,.20,.44),fA=Math.sin(fP*Math.PI);
+    if(fA>0){gCF(g,cx,cy,R*(.6+fA*2.8),0xFFFFFF,fA*.9);gCF(g,cx,cy,R*(.4+fA*1.2),rh,fA*.55);}
+    const swP=rm(it,.32,.90),swF=1-swP;
+    if(swP>0&&swF>0){
+      const swR=R*.3+eO(swP)*R*5.8,N=64,pts=[],pts2=[];
+      for(let i=0;i<=N;i++){const a=(i/N)*Math.PI*2;pts.push([cx+Math.cos(a)*swR,cy+Math.sin(a)*swR]);}
+      const lw=2.8*(1-swP*.55);if(lw>.15)gLS(g,pts,rh,lw,swF*.88);
+      if(swP<.65){const r2=swR*.72;for(let i=0;i<=N;i++){const a=(i/N)*Math.PI*2;pts2.push([cx+Math.cos(a)*r2,cy+Math.sin(a)*r2]);}gLS(g,pts2,rh,lw*.4,swF*.38);}
+    }
+    const sc=this.tw/100;
+    for(const ch of this.chunks){
+      const OFF=.30;if(it<ch.born+OFF||it>ch.life+OFF)continue;
+      const t=rm(it,ch.born+OFF,ch.life+OFF);
+      const d=eO(t)*ch.speed*sc;
+      const a=Math.pow(1-t,1.3)*.82,sz=ch.size*.38*sc;
+      if(sz>.1)gCF(g,cx+Math.cos(ch.angle)*d*.6,cy-eO(t)*d*1.1+t*t*d*.55,sz,hi(this.el.chunks[ch.colorIdx]),a);
+    }
+  }
+
+  slash(g,it){
+    const{cx,cy,R,seed,rh}=this;
+    for(let i=0;i<120;i++){
+      const s=seed+1000+i*13,cl=Math.floor(rng(s*.7)*12)/12*Math.PI*2;
+      const angle=cl+(rng(s*4.9)-.5)*1.1,md=R*(1.2+rng(s*5.5)*2.0);
+      const born=.02+rng(s*1.1)*.05,life=born+.45+rng(s*3.7)*.25;
+      if(it<born||it>life)continue;
+      const t=rm(it,born,life),d=t*t*t*md;
+      const px=cx+Math.cos(angle)*d,py=cy+Math.sin(angle)*d;
+      const tP=Math.max(0,t-.07),dP=tP*tP*tP*md;
+      const a=(1-t*t)*.88,sz=.5+rng(s*7.1)*1.0;
+      if(a<.02)continue;
+      if(d-dP>1)gL(g,cx+Math.cos(angle)*dP,cy+Math.sin(angle)*dP,px,py,rh,sz*.6,a*.55);
+      gCF(g,px,py,sz,hi(this.el.chunks[0]),a);
+    }
+    for(let i=0;i<18;i++){
+      const s=seed+3000+i*29,angle=rng(s*2.3)*Math.PI*2;
+      const md=R*(2.5+rng(s*4.1)*2.5),born=.02+rng(s*.9)*.04,life=born+.35+rng(s*1.7)*.15;
+      if(it<born||it>life)continue;
+      const t=rm(it,born,life),d=t*md,dP=Math.max(0,t-.10)*md;
+      const a=(1-t)*.75;
+      if(a>.02)gL(g,cx+Math.cos(angle)*dP,cy+Math.sin(angle)*dP,cx+Math.cos(angle)*d,cy+Math.sin(angle)*d,0xFFFFFF,.8,a);
+    }
+    for(let i=0;i<10;i++){
+      const s=seed+2000+i*71,angle=rng(s*3.1)*Math.PI*2;
+      const md=R*(.9+rng(s*4.1)*1.4),born=.02+rng(s*1.1)*.04,life=born+.55+rng(s*2.3)*.20;
+      if(it<born||it>life)continue;
+      const t=rm(it,born,life),d=t*t*t*md;
+      const a=(1-t*t)*.95,sz=1.8+rng(s*8.1)*2.5;
+      if(a>.02)gCF(g,cx+Math.cos(angle)*d,cy+Math.sin(angle)*d,sz,hi(this.el.chunks[0]),a);
+    }
+  }
+
+  // ── Particles: element-specific drawing ────────────────────────────────────
+  ch_(g,it){
+    const{cx,cy,el,chunks}=this;
+    const sc=Math.max(this.tw,this.th)/100;
+    for(const ch of chunks){
+      if(it<ch.born||it>ch.life+.08)continue;
+      const t=rm(it,ch.born,ch.life);
+      let dx=Math.cos(ch.angle)*eO(t)*ch.speed*sc;
+      let dy=Math.sin(ch.angle)*eO(t)*ch.speed*sc;
+      if(el.sparkMode)  dy-=t*30*sc;
+      if(el.bubbleMode) dy-=t*14*sc;
+      if(el.darkMode)   {dx*=.65;dy*=.65;}
+      if(el.wispMode)   {dx*=.42;dy*=.42;}
+      const px=cx+dx,py=cy+dy;
+      const slow=el.darkMode||el.wispMode;
+      const a=Math.pow(1-t,slow?.8:1.3);
+      const sz=ch.size*(.7+t*.35)*sc;
+      const hex=hi(el.chunks[ch.colorIdx]);
+
+      if(el.sparkMode){
+        // Вогонь: вертикальна іскра-стрік
+        const len=sz*3.2,ox=Math.cos(ch.angle+Math.PI*.5)*sz*.15;
+        gL(g,px,py,px+ox,py-len,hex,Math.max(1,sz*.45),a);
+        gL(g,px,py,px+ox,py-len,0xFFFFFF,Math.max(.5,sz*.12),a*.55);
+      }else if(el.iceMode){
+        // Лід: сніжинка — 6 промінів з гілками
+        const arm=sz*1.5;
+        for(let i=0;i<6;i++){
+          const aa=(i/6)*Math.PI*2;
+          const ex=px+Math.cos(aa)*arm,ey=py+Math.sin(aa)*arm;
+          gL(g,px,py,ex,ey,hex,1.8,a);
+          const mx=px+Math.cos(aa)*arm*.55,my=py+Math.sin(aa)*arm*.55;
+          for(const da of[.38,-.38]){
+            gL(g,mx,my,mx+Math.cos(aa+da)*arm*.35,my+Math.sin(aa+da)*arm*.35,hex,1.2,a*.75);
+          }
+        }
+      }else if(el.boltMode){
+        // Блискавка: зигзаг
+        const h=sz*2.8;
+        const pts=[[px,py],[px+sz*.55,py-h*.36],[px-sz*.42,py-h*.54],[px+sz*.2,py-h]];
+        gLS(g,pts,hex,2.0,a);gLS(g,pts,0xFFFFFF,.7,a*.5);
+      }else if(el.starMode){
+        // Аркана: 4-кутна зірка
+        const world=ch.pts.map(([ppx,ppy])=>[px+ppx*sz,py+ppy*sz]);
+        gPF(g,world,hex,a);gPF(g,world,0xFFFFFF,a*.25);
+      }else if(el.darkMode){
+        // Тінь: велика пляма
+        const world=ch.pts.map(([ppx,ppy])=>[px+ppx*sz,py+ppy*sz]);
+        gPF(g,world,hex,a*.9);
+      }else if(el.bubbleMode){
+        // Отрута: куля з обводкою і відблиском
+        gCF(g,px,py,sz*.82,hex,a*.55);
+        gCS(g,px,py,sz*.82,hex,2.0,a*.6);
+        gCF(g,px-sz*.22,py-sz*.22,sz*.18,0xFFFFFF,a*.55);
+      }else if(el.wispMode){
+        // Некротік: крапля + серцевина
+        const world=ch.pts.map(([ppx,ppy])=>[px+ppx*sz,py+ppy*sz]);
+        gPF(g,world,hex,a);
+        gCF(g,px,py,sz*.22,0xaa44aa,a*.7);
+      }else if(el.orbMode){
+        // Форс: кільце + центр
+        gCS(g,px,py,sz*.88,hex,2.5,a);
+        gCF(g,px,py,sz*.3,hex,a*.8);
+        gCS(g,px,py,sz*.52,hex,1.0,a*.4);
+      }else{
+        const world=ch.pts.map(([ppx,ppy])=>[px+ppx*sz,py+ppy*sz]);
+        gPF(g,world,hex,a);
+      }
+    }
+  }
+  bl_(g,it){
+    const{cx,cy,el,bolts}=this,sc=Math.max(this.tw,this.th)/100,bh=hi(el.bolts);
+    for(const bolt of bolts){
+      if(it<bolt.born||it>bolt.life)continue;
+      const t=rm(it,bolt.born,bolt.life),a=t<.3?t/.3:1-(t-.3)/.7;
+      const pts=bolt.pts.map(([px,py])=>[cx+px*sc,cy+py*sc]);
+      gLS(g,pts,bh,2.5*sc,a*.85);gLS(g,pts,0xFFFFFF,.8*sc,a*.65);
+    }
+  }
+}
+
+// ─── UI ────────────────────────────────────────────────────────────────────────
+let curE='none';
+const apps={};
+
+const picker=document.getElementById('picker');
+Object.entries(ELEMENTS).forEach(([k,cfg])=>{
+  const btn=document.createElement('button');
+  btn.className='elem-btn'+(k==='none'?' active':'');
+  btn.dataset.e=k;btn.textContent=cfg.icon+' '+cfg.label;
+  btn.addEventListener('click',()=>{
+    curE=k;
+    document.querySelectorAll('.elem-btn').forEach(b=>b.classList.toggle('active',b.dataset.e===k));
+    Object.keys(apps).forEach(play);
+  });
+  picker.appendChild(btn);
+});
+
+const TYPES=['streak','glint','particles','shockwave','pillar','slash'];
+function play(type){if(apps[type])new Anim(apps[type],type,curE).play();}
+
+TYPES.forEach((type,idx)=>{
+  const cell=document.createElement('div');cell.className='cell';
+  const lbl=document.createElement('div');lbl.className='label';lbl.textContent=type;
+  const cv=document.createElement('canvas');cv.width=300;cv.height=190;
+  cell.appendChild(lbl);cell.appendChild(cv);
+  document.getElementById('grid').appendChild(cell);
+  apps[type]=new PIXI.Application({view:cv,width:300,height:190,backgroundColor:0x070707,antialias:true});
+  cv.addEventListener('click',()=>play(type));
+  setTimeout(()=>play(type),250+idx*140);
+  setInterval(()=>play(type),3200+idx*210);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "id": "impact-frames",
+  "title": "Impact Frames",
+  "description": "Manga-style impact frame animations on critical hits.",
+  "version": "1.0.0",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "13"
+  },
+  "authors": [{ "name": "Vlad" }],
+  "esmodules": ["scripts/impact-frames.mjs"],
+  "styles": ["styles/impact-frames.css"],
+  "languages": [
+    { "lang": "en", "name": "English", "path": "lang/en.json" },
+    { "lang": "uk", "name": "Ukrainian", "path": "lang/uk.json" }
+  ],
+  "flags": {}
+}

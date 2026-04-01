@@ -1,0 +1,15 @@
+{
+  "IMPACT_FRAMES.CritText": "CRITICAL!",
+  "IMPACT_FRAMES.SettingEnabled": "Enable Animations",
+  "IMPACT_FRAMES.SettingShowOthers": "Show Other Tokens' Animations",
+  "IMPACT_FRAMES.SettingShake": "Screen Shake",
+  "IMPACT_FRAMES.SettingCritText": "Show Critical Text",
+  "IMPACT_FRAMES.SettingAnimRandom": "Randomize Animation Style",
+  "IMPACT_FRAMES.SettingAnimFixed": "Fixed Animation Style",
+  "IMPACT_FRAMES.SettingUseElements": "Use Elemental Variants",
+  "IMPACT_FRAMES.SettingElemFromWeapon": "Auto-detect Element from Weapon",
+  "IMPACT_FRAMES.SettingElemFromWeaponHint": "When enabled, the element is determined by the weapon's damage type (fire → fire, cold → ice, lightning, necrotic → shadow, etc.). Overrides random/fixed selection. Physical damage types (slashing, piercing, bludgeoning) show no element.",
+  "IMPACT_FRAMES.SettingElemFixed": "Fixed Element",
+  "IMPACT_FRAMES.SettingOnlyOwner": "Only for Message Author",
+  "IMPACT_FRAMES.SettingOnlyOwnerHint": "Show animation only on the client that rolled the attack."
+}

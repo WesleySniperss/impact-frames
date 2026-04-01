@@ -1,0 +1,15 @@
+{
+  "IMPACT_FRAMES.CritText": "КРИТ!",
+  "IMPACT_FRAMES.SettingEnabled": "Увімкнути анімації",
+  "IMPACT_FRAMES.SettingShowOthers": "Бачити анімації інших токенів",
+  "IMPACT_FRAMES.SettingShake": "Тряска екрану",
+  "IMPACT_FRAMES.SettingCritText": "Показувати текст критичного удару",
+  "IMPACT_FRAMES.SettingAnimRandom": "Рандомний стиль анімації",
+  "IMPACT_FRAMES.SettingAnimFixed": "Фіксований стиль анімації",
+  "IMPACT_FRAMES.SettingUseElements": "Використовувати стихійні варіації",
+  "IMPACT_FRAMES.SettingElemFromWeapon": "Авто-визначення стихії зі зброї",
+  "IMPACT_FRAMES.SettingElemFromWeaponHint": "Стихія анімації визначається типом шкоди зброї (вогонь → fire, холод → ice, блискавка, некротик → shadow тощо). Має пріоритет над рандомним/фіксованим вибором. Фізична шкода (рубляча, колюча, дробляча) — без стихії.",
+  "IMPACT_FRAMES.SettingElemFixed": "Фіксована стихія",
+  "IMPACT_FRAMES.SettingOnlyOwner": "Тільки для автора повідомлення",
+  "IMPACT_FRAMES.SettingOnlyOwnerHint": "Показує анімацію лише на клієнті, який кинув атаку."
+}
