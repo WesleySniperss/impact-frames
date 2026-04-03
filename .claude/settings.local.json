@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/Jonkm/AppData/Local/FoundryVTT/Data/modules/**)",
+      "Bash(powershell -Command \"Compress-Archive -Path 'impact-frames\\\\*' -DestinationPath 'impact-frames.zip' -Force\")"
+    ]
+  }
+}
